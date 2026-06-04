@@ -1,8 +1,8 @@
 package br.com.fiap.systhesis.controller;
 
-import br.com.fiap.systhesis.entity.Missao;
-import br.com.fiap.systhesis.entity.Usuario;
 import br.com.fiap.systhesis.dto.MissaoRequest;
+import br.com.fiap.systhesis.dto.MissaoResponse;
+import br.com.fiap.systhesis.entity.Usuario;
 import br.com.fiap.systhesis.service.MissaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -29,15 +29,15 @@ public class MissaoController {
 
     @GetMapping
     @Operation(summary = "Listar missões ativas")
-    public ResponseEntity<List<Missao>> listar() {
+    public ResponseEntity<List<MissaoResponse>> listar() {
         return ResponseEntity.ok(missaoService.listarAtivas());
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Buscar missão por ID")
-    public ResponseEntity<EntityModel<Missao>> buscarPorId(@PathVariable Long id) {
-        Missao missao = missaoService.buscarPorId(id);
-        return ResponseEntity.ok(EntityModel.of(missao,
+    public ResponseEntity<EntityModel<MissaoResponse>> buscarPorId(@PathVariable Long id) {
+        MissaoResponse response = missaoService.buscarPorId(id);
+        return ResponseEntity.ok(EntityModel.of(response,
                 linkTo(methodOn(MissaoController.class).buscarPorId(id)).withSelfRel(),
                 linkTo(methodOn(MissaoController.class).listar()).withRel("todas-missoes")
         ));
@@ -46,25 +46,25 @@ public class MissaoController {
     @PostMapping
     @Operation(summary = "Criar missão", description = "Apenas PROFESSOR ou ADMINISTRADOR")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<EntityModel<Missao>> criar(
+    public ResponseEntity<EntityModel<MissaoResponse>> criar(
             @RequestBody @Valid MissaoRequest request,
             @AuthenticationPrincipal Usuario usuario) {
 
-        Missao missao = missaoService.criar(request, usuario);
-        return ResponseEntity.status(HttpStatus.CREATED).body(EntityModel.of(missao,
-                linkTo(methodOn(MissaoController.class).buscarPorId(missao.getId())).withSelfRel()
+        MissaoResponse response = missaoService.criar(request, usuario);
+        return ResponseEntity.status(HttpStatus.CREATED).body(EntityModel.of(response,
+                linkTo(methodOn(MissaoController.class).buscarPorId(response.id())).withSelfRel()
         ));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar missão")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<EntityModel<Missao>> atualizar(
+    public ResponseEntity<EntityModel<MissaoResponse>> atualizar(
             @PathVariable Long id,
             @RequestBody @Valid MissaoRequest request) {
 
-        Missao missao = missaoService.atualizar(id, request);
-        return ResponseEntity.ok(EntityModel.of(missao,
+        MissaoResponse response = missaoService.atualizar(id, request);
+        return ResponseEntity.ok(EntityModel.of(response,
                 linkTo(methodOn(MissaoController.class).buscarPorId(id)).withSelfRel()
         ));
     }

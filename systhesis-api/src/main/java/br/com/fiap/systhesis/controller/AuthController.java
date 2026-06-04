@@ -1,9 +1,9 @@
 package br.com.fiap.systhesis.controller;
 
-import br.com.fiap.systhesis.entity.Usuario;
 import br.com.fiap.systhesis.dto.CadastroUsuarioRequest;
 import br.com.fiap.systhesis.dto.LoginRequest;
 import br.com.fiap.systhesis.dto.TokenResponse;
+import br.com.fiap.systhesis.dto.UsuarioResponse;
 import br.com.fiap.systhesis.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,8 +29,7 @@ public class AuthController {
 
     @PostMapping("/cadastro")
     @Operation(summary = "Cadastrar usuário", description = "Cria um novo usuário (aluno, professor ou administrador)")
-    public ResponseEntity<Usuario> cadastrar(@RequestBody @Valid CadastroUsuarioRequest request) {
-        Usuario usuario = authService.cadastrar(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(usuario);
+    public ResponseEntity<UsuarioResponse> cadastrar(@RequestBody @Valid CadastroUsuarioRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(UsuarioResponse.from(authService.cadastrar(request)));
     }
 }

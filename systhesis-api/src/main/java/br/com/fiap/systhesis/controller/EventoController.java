@@ -1,7 +1,7 @@
 package br.com.fiap.systhesis.controller;
 
 import br.com.fiap.systhesis.dto.EventoRequest;
-import br.com.fiap.systhesis.entity.Evento;
+import br.com.fiap.systhesis.dto.EventoResponse;
 import br.com.fiap.systhesis.service.EventoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -29,7 +29,7 @@ public class EventoController {
 
     @GetMapping
     @Operation(summary = "Listar eventos", description = "Lista todos os eventos ou filtra por colônia quando coloniaId for informado")
-    public ResponseEntity<List<Evento>> listar(@RequestParam(required = false) Long coloniaId) {
+    public ResponseEntity<List<EventoResponse>> listar(@RequestParam(required = false) Long coloniaId) {
         if (coloniaId != null) {
             return ResponseEntity.ok(eventoService.listarPorColonia(coloniaId));
         }
@@ -38,26 +38,22 @@ public class EventoController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Buscar evento por ID")
-    public ResponseEntity<EntityModel<Evento>> buscarPorId(@PathVariable Long id) {
-        Evento evento = eventoService.buscarPorId(id);
-        return ResponseEntity.ok(toModel(evento));
+    public ResponseEntity<EntityModel<EventoResponse>> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(toModel(eventoService.buscarPorId(id)));
     }
 
     @PostMapping
     @Operation(summary = "Criar evento", description = "Registra um evento e aplica impacto nos recursos da colônia")
-    public ResponseEntity<EntityModel<Evento>> criar(@RequestBody @Valid EventoRequest request) {
-        Evento evento = eventoService.criar(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(toModel(evento));
+    public ResponseEntity<EntityModel<EventoResponse>> criar(@RequestBody @Valid EventoRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(toModel(eventoService.criar(request)));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar evento", description = "Atualiza título, descrição, colônia e impacto percentual do evento")
-    public ResponseEntity<EntityModel<Evento>> atualizar(
+    public ResponseEntity<EntityModel<EventoResponse>> atualizar(
             @PathVariable Long id,
             @RequestBody @Valid EventoRequest request) {
-
-        Evento evento = eventoService.atualizar(id, request);
-        return ResponseEntity.ok(toModel(evento));
+        return ResponseEntity.ok(toModel(eventoService.atualizar(id, request)));
     }
 
     @DeleteMapping("/{id}")
@@ -67,12 +63,12 @@ public class EventoController {
         return ResponseEntity.noContent().build();
     }
 
-    private EntityModel<Evento> toModel(Evento evento) {
-        return EntityModel.of(evento,
-                linkTo(methodOn(EventoController.class).buscarPorId(evento.getId())).withSelfRel(),
+    private EntityModel<EventoResponse> toModel(EventoResponse r) {
+        return EntityModel.of(r,
+                linkTo(methodOn(EventoController.class).buscarPorId(r.id())).withSelfRel(),
                 linkTo(methodOn(EventoController.class).listar(null)).withRel("todos-eventos"),
-                Link.of("/eventos?coloniaId=" + evento.getColonia().getId()).withRel("eventos-da-colonia"),
-                Link.of("/colonias/" + evento.getColonia().getId()).withRel("colonia")
+                Link.of("/eventos?coloniaId=" + r.coloniaId()).withRel("eventos-da-colonia"),
+                Link.of("/colonias/" + r.coloniaId()).withRel("colonia")
         );
     }
 }
