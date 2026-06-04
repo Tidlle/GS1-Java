@@ -74,15 +74,18 @@ public class ColoniaService {
         });
     }
 
+    @Transactional(readOnly = true)
     public Colonia buscarPorId(Long id) {
         return coloniaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Colônia não encontrada com id: " + id));
     }
 
+    @Transactional(readOnly = true)
     public List<Colonia> listarPorUsuario(Long usuarioId) {
         return coloniaRepository.findByUsuarioId(usuarioId);
     }
 
+    @Transactional(readOnly = true)
     public List<Colonia> ranking() {
         return coloniaRepository.findRanking();
     }
@@ -105,6 +108,7 @@ public class ColoniaService {
         coloniaRepository.delete(colonia);
     }
 
+    @Transactional(readOnly = true)
     public List<RecursoColonia> listarRecursos(Long coloniaId) {
         buscarPorId(coloniaId); // valida existência
         return recursoColoniaRepository.findByColoniaId(coloniaId);

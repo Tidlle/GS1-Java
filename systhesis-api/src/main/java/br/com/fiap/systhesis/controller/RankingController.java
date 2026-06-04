@@ -1,6 +1,6 @@
 package br.com.fiap.systhesis.controller;
 
-import br.com.fiap.systhesis.entity.Colonia;
+import br.com.fiap.systhesis.dto.ColoniaResponse;
 import br.com.fiap.systhesis.service.ColoniaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,7 +22,11 @@ public class RankingController {
 
     @GetMapping
     @Operation(summary = "Consultar ranking", description = "Lista colônias ordenadas por pontuação total (público)")
-    public ResponseEntity<List<Colonia>> ranking() {
-        return ResponseEntity.ok(coloniaService.ranking());
+    public ResponseEntity<List<ColoniaResponse>> ranking() {
+        List<ColoniaResponse> ranking = coloniaService.ranking()
+                .stream()
+                .map(ColoniaResponse::from)
+                .toList();
+        return ResponseEntity.ok(ranking);
     }
 }
