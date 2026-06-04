@@ -38,9 +38,13 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoints públicos
+                        // Rota raiz
+                        .requestMatchers("/").permitAll()
+                        // Endpoints de autenticação
                         .requestMatchers("/auth/**").permitAll()
+                        // Documentação
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**").permitAll()
+                        // H2 Console
                         .requestMatchers("/h2-console/**").permitAll()
                         // Ranking público
                         .requestMatchers(HttpMethod.GET, "/ranking").permitAll()
@@ -49,6 +53,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/missoes/**").hasAnyRole("PROFESSOR", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.PUT, "/missoes/**").hasAnyRole("PROFESSOR", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.DELETE, "/missoes/**").hasAnyRole("PROFESSOR", "ADMINISTRADOR")
+                        // Leitura pública para testes de deploy
+                        .requestMatchers(HttpMethod.GET, "/colonias/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/eventos/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/tentativas/**").permitAll()
                         // Demais endpoints requerem autenticação
                         .anyRequest().authenticated()
                 )
