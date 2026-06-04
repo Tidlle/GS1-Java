@@ -38,8 +38,8 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Rota raiz
-                        .requestMatchers("/").permitAll()
+                        // Rota raiz e tratamento de erros
+                        .requestMatchers("/", "/error").permitAll()
                         // Endpoints de autenticação
                         .requestMatchers("/auth/**").permitAll()
                         // Documentação
