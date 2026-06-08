@@ -26,28 +26,19 @@ public class TentativaService {
 
     @Transactional(readOnly = true)
     public List<TentativaResponse> listarTodas() {
-        return tentativaRepository.findAll()
-                .stream()
-                .map(TentativaResponse::from)
-                .toList();
+        return tentativaRepository.findAll().stream().map(TentativaResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
     public List<TentativaResponse> listarPorUsuario(Long usuarioId) {
-        return tentativaRepository.findByUsuarioId(usuarioId)
-                .stream()
-                .map(TentativaResponse::from)
-                .toList();
+        return tentativaRepository.findByUsuarioId(usuarioId).stream().map(TentativaResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
     public List<TentativaResponse> listarPorColonia(Long coloniaId) {
         coloniaRepository.findById(coloniaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Colônia não encontrada com id: " + coloniaId));
-        return tentativaRepository.findByColoniaId(coloniaId)
-                .stream()
-                .map(TentativaResponse::from)
-                .toList();
+        return tentativaRepository.findByColoniaId(coloniaId).stream().map(TentativaResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
@@ -60,7 +51,7 @@ public class TentativaService {
         Pergunta pergunta = buscarPergunta(request.perguntaId());
         Colonia colonia   = buscarColonia(request.coloniaId());
 
-        boolean correta = respostaEstaCorreta(pergunta, request.respostaEnviada());
+        boolean correta = respostaCorreta(pergunta, request.respostaEnviada());
         int pontos      = calcularPontos(pergunta, correta);
 
         if (correta) {
@@ -82,11 +73,11 @@ public class TentativaService {
     @Transactional
     public TentativaResponse atualizar(Long id, TentativaRequest request) {
         Tentativa tentativa = findTentativa(id);
-        removerPontuacaoAnterior(tentativa);
+        removerPontuacao(tentativa);
 
         Pergunta pergunta = buscarPergunta(request.perguntaId());
         Colonia colonia   = buscarColonia(request.coloniaId());
-        boolean correta   = respostaEstaCorreta(pergunta, request.respostaEnviada());
+        boolean correta   = respostaCorreta(pergunta, request.respostaEnviada());
         int pontos        = calcularPontos(pergunta, correta);
 
         if (correta) {
@@ -105,7 +96,7 @@ public class TentativaService {
     @Transactional
     public void deletar(Long id) {
         Tentativa tentativa = findTentativa(id);
-        removerPontuacaoAnterior(tentativa);
+        removerPontuacao(tentativa);
         tentativaRepository.delete(tentativa);
     }
 
@@ -126,24 +117,36 @@ public class TentativaService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Colônia não encontrada com id: " + coloniaId));
     }
 
-    private boolean respostaEstaCorreta(Pergunta pergunta, String respostaEnviada) {
-        return pergunta.getRespostaCorreta().equalsIgnoreCase(respostaEnviada);
+    private boolean respostaCorreta(Pergunta pergunta, String resposta) {
+        return pergunta.getRespostaCorreta().equalsIgnoreCase(resposta);
     }
 
     private int calcularPontos(Pergunta pergunta, boolean correta) {
         return correta ? pergunta.getMissao().getPontosRecompensa() : 0;
     }
 
+    /**
+     * Adiciona pontos à colônia e sincroniza pontuacaoTotal, xp e nivel.
+     */
     private void adicionarPontos(Colonia colonia, int pontos) {
         colonia.setPontuacaoTotal(colonia.getPontuacaoTotal() + pontos);
+        int novoXp = colonia.getXp() + pontos;
+        colonia.setXp(novoXp);
+        colonia.setNivel(ColoniaService.calcularNivel(novoXp));
         coloniaRepository.save(colonia);
     }
 
-    private void removerPontuacaoAnterior(Tentativa tentativa) {
-        Integer pontosObtidos = tentativa.getPontosObtidos();
-        if (Boolean.TRUE.equals(tentativa.getCorreta()) && pontosObtidos != null && pontosObtidos > 0) {
+    /**
+     * Remove pontuação de uma tentativa correta anterior e recalcula xp e nivel.
+     */
+    private void removerPontuacao(Tentativa tentativa) {
+        Integer pontos = tentativa.getPontosObtidos();
+        if (Boolean.TRUE.equals(tentativa.getCorreta()) && pontos != null && pontos > 0) {
             Colonia colonia = tentativa.getColonia();
-            colonia.setPontuacaoTotal(Math.max(0, colonia.getPontuacaoTotal() - pontosObtidos));
+            colonia.setPontuacaoTotal(Math.max(0, colonia.getPontuacaoTotal() - pontos));
+            int novoXp = Math.max(0, colonia.getXp() - pontos);
+            colonia.setXp(novoXp);
+            colonia.setNivel(ColoniaService.calcularNivel(novoXp));
             coloniaRepository.save(colonia);
         }
     }

@@ -20,7 +20,7 @@ public class Colonia {
     @Column(nullable = false, length = 100)
     private String nome;
 
-    /** Embedded — localização espacial da base */
+    /** Embedded — localização espacial da base (modelagem avançada: @Embeddable) */
     @Embedded
     private LocalizacaoEspacial localizacao;
 
@@ -28,13 +28,49 @@ public class Colonia {
     @Column(nullable = false)
     private StatusColonia status;
 
-    @Column(name = "pontuacao_total")
-    private Integer pontuacaoTotal;
+    // ── Recursos diretos (integração mobile) ────────────────────────────────────
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer agua = 70;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer energia = 80;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer oxigenio = 90;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer alimento = 40;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer temperatura = 22;
+
+    // ── Progressão do jogador ────────────────────────────────────────────────────
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer nivel = 1;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer xp = 0;
+
+    @Builder.Default
+    @Column(name = "pontuacao_total", nullable = false)
+    private Integer pontuacaoTotal = 0;
+
+    // ── Relacionamentos ──────────────────────────────────────────────────────────
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuario;
 
+    /** Modelagem avançada: @OneToMany com chave composta @EmbeddedId */
     @OneToMany(mappedBy = "colonia", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<RecursoColonia> recursos = new ArrayList<>();
@@ -45,7 +81,14 @@ public class Colonia {
     @PrePersist
     public void prePersist() {
         this.criadaEm = LocalDateTime.now();
-        if (this.status == null) this.status = StatusColonia.ATIVA;
+        if (this.status       == null) this.status       = StatusColonia.ATIVA;
+        if (this.agua         == null) this.agua         = 70;
+        if (this.energia      == null) this.energia      = 80;
+        if (this.oxigenio     == null) this.oxigenio     = 90;
+        if (this.alimento     == null) this.alimento     = 40;
+        if (this.temperatura  == null) this.temperatura  = 22;
+        if (this.nivel        == null) this.nivel        = 1;
+        if (this.xp           == null) this.xp           = 0;
         if (this.pontuacaoTotal == null) this.pontuacaoTotal = 0;
     }
 }

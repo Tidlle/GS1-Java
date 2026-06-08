@@ -89,7 +89,7 @@ public class ColoniaController {
         return EntityModel.of(response,
                 linkTo(methodOn(ColoniaController.class).buscarPorId(response.id())).withSelfRel(),
                 linkTo(methodOn(ColoniaController.class).listarRecursos(response.id())).withRel("recursos"),
-                Link.of("/missoes?planeta=" + response.localizacao().planeta()).withRel("missoes-disponiveis"),
+                Link.of("/missoes?planeta=" + response.planeta()).withRel("missoes-disponiveis"),
                 Link.of("/eventos?coloniaId=" + response.id()).withRel("eventos")
         );
     }

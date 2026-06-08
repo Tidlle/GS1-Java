@@ -1,5 +1,6 @@
 package br.com.fiap.systhesis.service;
 
+import br.com.fiap.systhesis.dto.ColoniaRequest;
 import br.com.fiap.systhesis.entity.Colonia;
 import br.com.fiap.systhesis.entity.LocalizacaoEspacial;
 import br.com.fiap.systhesis.entity.RecursoColonia;
@@ -7,7 +8,6 @@ import br.com.fiap.systhesis.entity.RecursoColoniaId;
 import br.com.fiap.systhesis.entity.Usuario;
 import br.com.fiap.systhesis.enums.StatusColonia;
 import br.com.fiap.systhesis.enums.TipoRecurso;
-import br.com.fiap.systhesis.dto.ColoniaRequest;
 import br.com.fiap.systhesis.exception.RecursoNaoEncontradoException;
 import br.com.fiap.systhesis.repository.ColoniaRepository;
 import br.com.fiap.systhesis.repository.RecursoColoniaRepository;
@@ -25,6 +25,20 @@ public class ColoniaService {
     private final ColoniaRepository coloniaRepository;
     private final RecursoColoniaRepository recursoColoniaRepository;
 
+    // ── Nível calculado com base no XP ───────────────────────────────────────────
+    // xp   0–99   → nível 1
+    // xp 100–299  → nível 2
+    // xp 300–599  → nível 3
+    // xp 600–999  → nível 4
+    // xp ≥ 1000   → nível 5
+    public static int calcularNivel(int xp) {
+        if (xp >= 1000) return 5;
+        if (xp >= 600)  return 4;
+        if (xp >= 300)  return 3;
+        if (xp >= 100)  return 2;
+        return 1;
+    }
+
     @Transactional
     public Colonia criar(ColoniaRequest request, Usuario usuario) {
         Colonia colonia = Colonia.builder()
@@ -36,30 +50,39 @@ public class ColoniaService {
                         .longitude(request.longitude())
                         .build())
                 .status(StatusColonia.ATIVA)
+                // recursos diretos (mobile)
+                .agua(70)
+                .energia(80)
+                .oxigenio(90)
+                .alimento(40)
+                .temperatura(22)
+                // progressão
+                .nivel(1)
+                .xp(0)
                 .pontuacaoTotal(0)
                 .usuario(usuario)
                 .build();
 
         colonia = coloniaRepository.save(colonia);
 
-        // Inicializar recursos com valores padrão
-        inicializarRecursos(colonia);
+        // Inicializa RecursoColonia (modelagem avançada: chave composta @EmbeddedId)
+        inicializarRecursosColonia(colonia);
 
         return coloniaRepository.findById(colonia.getId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Colônia não encontrada após criação."));
     }
 
-    private void inicializarRecursos(Colonia colonia) {
-        double[][] recursos = {
-            // TipoRecurso.ordinal -> {quantidade, maximo}
-        };
-
+    /**
+     * Popula a tabela tb_recurso_colonia com chave composta (coloniaId + tipoRecurso).
+     * Mantido para satisfazer o requisito de modelagem avançada de Java Advanced.
+     */
+    private void inicializarRecursosColonia(Colonia colonia) {
         Arrays.stream(TipoRecurso.values()).forEach(tipo -> {
             double quantidade = switch (tipo) {
-                case AGUA -> 70.0;
-                case ENERGIA -> 80.0;
-                case OXIGENIO -> 90.0;
-                case ALIMENTO -> 40.0;
+                case AGUA        -> 70.0;
+                case ENERGIA     -> 80.0;
+                case OXIGENIO    -> 90.0;
+                case ALIMENTO    -> 40.0;
                 case TEMPERATURA -> 22.0;
             };
             double maximo = tipo == TipoRecurso.TEMPERATURA ? 40.0 : 100.0;
@@ -93,6 +116,7 @@ public class ColoniaService {
     @Transactional
     public Colonia atualizar(Long id, ColoniaRequest request) {
         Colonia colonia = buscarPorId(id);
+        // Atualiza apenas nome e localização — recursos, XP e nível são preservados
         colonia.setNome(request.nome());
         colonia.setLocalizacao(LocalizacaoEspacial.builder()
                 .planeta(request.planeta())
@@ -103,9 +127,9 @@ public class ColoniaService {
         return coloniaRepository.save(colonia);
     }
 
+    @Transactional
     public void deletar(Long id) {
-        Colonia colonia = buscarPorId(id);
-        coloniaRepository.delete(colonia);
+        coloniaRepository.delete(buscarPorId(id));
     }
 
     @Transactional(readOnly = true)

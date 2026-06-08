@@ -24,20 +24,14 @@ public class EventoService {
 
     @Transactional(readOnly = true)
     public List<EventoResponse> listarTodos() {
-        return eventoRepository.findAll()
-                .stream()
-                .map(EventoResponse::from)
-                .toList();
+        return eventoRepository.findAll().stream().map(EventoResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
     public List<EventoResponse> listarPorColonia(Long coloniaId) {
         coloniaRepository.findById(coloniaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Colônia não encontrada: " + coloniaId));
-        return eventoRepository.findByColoniaId(coloniaId)
-                .stream()
-                .map(EventoResponse::from)
-                .toList();
+        return eventoRepository.findByColoniaId(coloniaId).stream().map(EventoResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
@@ -50,7 +44,7 @@ public class EventoService {
         Colonia colonia = buscarColonia(request.coloniaId());
         Evento evento = construirEvento(request, colonia);
         evento = eventoRepository.save(evento);
-        aplicarImpactoNosRecursos(request, colonia);
+        aplicarImpacto(request, colonia);
         return EventoResponse.from(evento);
     }
 
@@ -60,7 +54,7 @@ public class EventoService {
 
         if (!getTipoEvento(evento).equals(request.tipoEvento())) {
             throw new IllegalArgumentException(
-                    "Não é permitido alterar o tipo do evento. Exclua o evento atual e crie um novo com o tipo desejado."
+                    "Não é permitido alterar o tipo do evento. Exclua e crie um novo com o tipo desejado."
             );
         }
 
@@ -69,7 +63,6 @@ public class EventoService {
         evento.setDescricao(request.descricao());
         evento.setColonia(colonia);
         evento.setImpactoPercentual(request.impactoPercentual());
-
         return EventoResponse.from(eventoRepository.save(evento));
     }
 
@@ -93,49 +86,54 @@ public class EventoService {
     private Evento construirEvento(EventoRequest request, Colonia colonia) {
         return switch (request.tipoEvento()) {
             case "TEMPESTADE_SOLAR" -> TempestadeSolar.builder()
-                    .titulo(request.titulo())
-                    .descricao(request.descricao())
-                    .colonia(colonia)
-                    .impactoPercentual(request.impactoPercentual())
-                    .build();
+                    .titulo(request.titulo()).descricao(request.descricao())
+                    .colonia(colonia).impactoPercentual(request.impactoPercentual()).build();
             case "FALHA_ENERGETICA" -> FalhaEnergetica.builder()
-                    .titulo(request.titulo())
-                    .descricao(request.descricao())
-                    .colonia(colonia)
-                    .impactoPercentual(request.impactoPercentual())
-                    .build();
-            case "VAZAMENTO_AGUA" -> VazamentoAgua.builder()
-                    .titulo(request.titulo())
-                    .descricao(request.descricao())
-                    .colonia(colonia)
-                    .impactoPercentual(request.impactoPercentual())
-                    .build();
-            case "PERDA_COLHEITA" -> PerdaColheita.builder()
-                    .titulo(request.titulo())
-                    .descricao(request.descricao())
-                    .colonia(colonia)
-                    .impactoPercentual(request.impactoPercentual())
-                    .build();
+                    .titulo(request.titulo()).descricao(request.descricao())
+                    .colonia(colonia).impactoPercentual(request.impactoPercentual()).build();
+            case "VAZAMENTO_AGUA"   -> VazamentoAgua.builder()
+                    .titulo(request.titulo()).descricao(request.descricao())
+                    .colonia(colonia).impactoPercentual(request.impactoPercentual()).build();
+            case "PERDA_COLHEITA"   -> PerdaColheita.builder()
+                    .titulo(request.titulo()).descricao(request.descricao())
+                    .colonia(colonia).impactoPercentual(request.impactoPercentual()).build();
             default -> throw new IllegalArgumentException("Tipo de evento inválido: " + request.tipoEvento());
         };
     }
 
-    private void aplicarImpactoNosRecursos(EventoRequest request, Colonia colonia) {
-        TipoRecurso tipoImpactado = switch (request.tipoEvento()) {
+    /**
+     * Aplica o impacto em dois lugares:
+     *  1. RecursoColonia — tabela com chave composta (modelagem avançada)
+     *  2. Campos diretos da Colonia — para consumo imediato pelo app mobile
+     */
+    private void aplicarImpacto(EventoRequest request, Colonia colonia) {
+        TipoRecurso tipo = switch (request.tipoEvento()) {
             case "TEMPESTADE_SOLAR", "FALHA_ENERGETICA" -> TipoRecurso.ENERGIA;
             case "VAZAMENTO_AGUA"                       -> TipoRecurso.AGUA;
             case "PERDA_COLHEITA"                       -> TipoRecurso.ALIMENTO;
             default                                     -> null;
         };
 
-        if (tipoImpactado != null) {
-            RecursoColoniaId recursoId = new RecursoColoniaId(colonia.getId(), tipoImpactado);
-            recursoColoniaRepository.findById(recursoId).ifPresent(recurso -> {
-                double reducao = recurso.getQuantidade() * (request.impactoPercentual() / 100.0);
-                recurso.setQuantidade(Math.max(0, recurso.getQuantidade() - reducao));
-                recursoColoniaRepository.save(recurso);
-            });
+        if (tipo == null) return;
+
+        double fator = request.impactoPercentual() / 100.0;
+
+        // 1. Atualiza RecursoColonia (chave composta — mantido para modelagem avançada)
+        RecursoColoniaId recursoId = new RecursoColoniaId(colonia.getId(), tipo);
+        recursoColoniaRepository.findById(recursoId).ifPresent(recurso -> {
+            double reducao = recurso.getQuantidade() * fator;
+            recurso.setQuantidade(Math.max(0, recurso.getQuantidade() - reducao));
+            recursoColoniaRepository.save(recurso);
+        });
+
+        // 2. Atualiza campo direto da Colonia (facilita consumo mobile)
+        switch (tipo) {
+            case ENERGIA  -> colonia.setEnergia ((int) Math.max(0, colonia.getEnergia()  - colonia.getEnergia()  * fator));
+            case AGUA     -> colonia.setAgua    ((int) Math.max(0, colonia.getAgua()     - colonia.getAgua()     * fator));
+            case ALIMENTO -> colonia.setAlimento((int) Math.max(0, colonia.getAlimento() - colonia.getAlimento() * fator));
+            default       -> { /* OXIGENIO e TEMPERATURA não têm evento direto */ }
         }
+        coloniaRepository.save(colonia);
     }
 
     private String getTipoEvento(Evento evento) {
