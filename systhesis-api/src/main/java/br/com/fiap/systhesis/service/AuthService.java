@@ -9,6 +9,7 @@ import br.com.fiap.systhesis.exception.EmailJaCadastradoException;
 import br.com.fiap.systhesis.repository.UsuarioRepository;
 import br.com.fiap.systhesis.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
@@ -30,15 +32,20 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(request.email(), request.senha())
             );
         } catch (AuthenticationException e) {
+            log.warn("Falha de autenticação para [{}]: {}", request.email(), e.getMessage());
             throw new CredenciaisInvalidasException();
         }
 
         Usuario usuario = usuarioRepository.findByEmail(request.email())
                 .orElseThrow(CredenciaisInvalidasException::new);
 
-        String token = jwtService.gerarToken(usuario);
-
-        return new TokenResponse(token, "Bearer", usuario.getEmail(), usuario.getPerfil().name());
+        try {
+            String token = jwtService.gerarToken(usuario);
+            return new TokenResponse(token, "Bearer", usuario.getEmail(), usuario.getPerfil().name());
+        } catch (Exception e) {
+            log.error("Erro ao gerar token JWT para [{}]: {}", request.email(), e.getMessage(), e);
+            throw new RuntimeException("Erro ao gerar token de autenticação.", e);
+        }
     }
 
     public Usuario cadastrar(CadastroUsuarioRequest request) {
