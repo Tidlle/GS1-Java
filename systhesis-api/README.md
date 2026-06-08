@@ -54,11 +54,12 @@ O Systhesis tem como objetivo estimular:
 | **Cadastro e Login** | Criação de conta com perfil ALUNO, PROFESSOR ou ADMINISTRADOR |
 | **Autenticação JWT** | Token Bearer gerado no login e exigido nos endpoints protegidos |
 | **Gerenciamento de Colônias** | CRUD completo para criação e administração de bases espaciais |
-| **Controle de Recursos** | Acompanhamento em tempo real de água, energia, oxigênio, alimento e temperatura |
-| **Eventos de Impacto** | Quatro tipos de eventos que reduzem recursos específicos da colônia |
+| **Controle de Recursos** | Campos diretos na colônia: água, energia, oxigênio, alimento e temperatura |
+| **Eventos de Impacto** | Quatro tipos de eventos que reduzem recursos específicos (campos diretos + RecursoColonia) |
 | **Missões Educacionais** | Desafios com perguntas de múltipla escolha vinculados a planetas e dificuldades |
 | **Tentativas de Resposta** | Registro das respostas dos alunos com correção automática |
-| **Sistema de Pontuação** | Respostas corretas adicionam pontos à colônia do aluno |
+| **Sistema de Pontuação** | Respostas corretas adicionam pontos e sincronizam `pontuacaoTotal`, `xp` e `nivel` |
+| **Sistema de Progressão** | Colônia evolui de nível 1 a 5 conforme XP acumulado pelas tentativas corretas |
 | **Ranking Global** | Classificação pública das colônias ordenadas por pontuação total |
 | **Documentação Swagger** | Interface interativa para exploração e teste de todos os endpoints |
 
@@ -66,21 +67,21 @@ O Systhesis tem como objetivo estimular:
 
 ## Tecnologias Utilizadas
 
-| Tecnologia | Versão | Finalidade |
-|---|---|---|
-| **Java** | 21 | Linguagem principal |
-| **Spring Boot** | 3.2.5 | Framework principal |
-| **Spring Web** | — | Criação de endpoints REST |
-| **Spring Data JPA** | — | Persistência e repositórios |
-| **Spring Security** | — | Autenticação e autorização |
-| **JJWT** | 0.11.5 | Geração e validação de tokens JWT |
-| **Spring Validation** | — | Validação de dados de entrada |
-| **Lombok** | — | Redução de boilerplate (getters, builders, etc.) |
+| Tecnologia               | Versão | Finalidade |
+|--------------------------|---|---|
+| **Java**                 | 21 | Linguagem principal |
+| **Spring Boot**          | 3.2.5 | Framework principal |
+| **Spring Web**           | — | Criação de endpoints REST |
+| **Spring Data JPA**      | — | Persistência e repositórios |
+| **Spring Security**      | — | Autenticação e autorização |
+| **Java JWT**             | 0.11.5 | Geração e validação de tokens JWT |
+| **Spring Validation**    | — | Validação de dados de entrada |
+| **Lombok**               | — | Redução de boilerplate (getters, builders, etc.) |
 | **Spring Boot DevTools** | — | Recarregamento automático em desenvolvimento |
-| **Springdoc OpenAPI** | 2.5.0 | Documentação Swagger/OpenAPI |
-| **H2 Database** | — | Banco de dados em memória para testes e deploy |
-| **Maven** | 3.x | Gerenciamento de dependências e build |
-| **Render** | — | Plataforma de deploy público da API |
+| **Springdoc OpenAPI**    | 2.5.0 | Documentação Swagger/OpenAPI |
+| **H2 Database**          | — | Banco de dados em memória para testes e deploy |
+| **Maven**                | 3.x | Gerenciamento de dependências e build |
+| **Render**               | — | Plataforma de deploy público da API |
 
 ---
 
@@ -89,7 +90,7 @@ O Systhesis tem como objetivo estimular:
 O projeto segue a **arquitetura em camadas** padrão do ecossistema Spring Boot, garantindo separação de responsabilidades e facilidade de manutenção.
 
 ```
-controller   →  recebe requisições HTTP, delega ao service, retorna DTOs
+controller   →  recebe requisições HTTP, transfere ao service, retorna DTOs
 service      →  contém a lógica de negócio e orquestra as operações
 repository   →  acesso ao banco de dados via Spring Data JPA
 entity       →  mapeamento das tabelas do banco com anotações JPA
@@ -190,6 +191,19 @@ systhesis-api/
 
 O projeto implementa quatro requisitos de modelagem avançada com JPA:
 
+### Estratégia de recursos: dupla camada
+
+A entidade `Colonia` mantém **dois mecanismos de recursos em paralelo**, intencionalmente:
+
+| Mecanismo | Onde vive | Para quê |
+|---|---|---|
+| Campos diretos (`agua`, `energia`, etc.) | Tabela `tb_colonia` | Consumo imediato pelo app mobile — leitura simples, sem joins |
+| `RecursoColonia` com chave composta | Tabela `tb_recurso_colonia` | Requisito de modelagem avançada — chave `@EmbeddedId` (nota de Java Advanced) |
+
+Ambos são **sincronizados automaticamente**: ao criar uma colônia os dois são inicializados; ao registrar um evento o impacto é aplicado nos dois.
+
+---
+
 ### 1. Herança JPA — `SINGLE_TABLE`
 A entidade `Evento` é uma **classe abstrata** que utiliza `@Inheritance(strategy = InheritanceType.SINGLE_TABLE)`. Cada tipo de evento é uma subclasse com seu próprio `@DiscriminatorValue`:
 
@@ -208,6 +222,20 @@ A tabela `tb_recurso_colonia` utiliza `@EmbeddedId` com a classe `RecursoColonia
 
 ### 4. Múltiplas Tabelas e Relacionamentos
 O modelo conta com **8 tabelas** com relacionamentos `@ManyToOne` e `@OneToMany`, todos com `FetchType.LAZY` para otimização de performance.
+
+### 5. Sistema de Progressão (XP e Nível)
+
+A colônia evolui à medida que o aluno acerta tentativas. O nível é recalculado automaticamente a cada acerto ou edição/exclusão de tentativa:
+
+| XP acumulado | Nível |
+|---|---|
+| 0 – 99 | 1 |
+| 100 – 299 | 2 |
+| 300 – 599 | 3 |
+| 600 – 999 | 4 |
+| ≥ 1000 | 5 |
+
+Os três campos são sempre mantidos em sincronia: `pontuacaoTotal`, `xp` e `nivel`.
 
 ---
 
@@ -281,14 +309,34 @@ Cliente → GET /colonias (Header: Authorization: Bearer <token>) → JwtAuthFil
 | `DELETE` | `/colonias/{id}` | ✅ JWT | Exclui a colônia |
 | `GET` | `/colonias/{id}/recursos` | ✅ JWT | Lista os recursos da colônia |
 
-**Exemplo de body — criar colônia:**
+**Exemplo de body — criar colônia** (mínimo exigido):
 ```json
 {
   "nome": "Base Alfa",
+  "planeta": "MARTE"
+}
+```
+Os campos `setor`, `latitude` e `longitude` são opcionais.
+
+**Exemplo de resposta** `201 Created`:
+```json
+{
+  "id": 1,
+  "nome": "Base Alfa",
   "planeta": "MARTE",
-  "setor": "A-7",
-  "latitude": -14.5,
-  "longitude": 32.1
+  "setor": null,
+  "latitude": null,
+  "longitude": null,
+  "status": "ATIVA",
+  "agua": 70,
+  "energia": 80,
+  "oxigenio": 90,
+  "alimento": 40,
+  "temperatura": 22,
+  "nivel": 1,
+  "xp": 0,
+  "pontuacaoTotal": 0,
+  "criadaEm": "2026-06-08T12:00:00"
 }
 ```
 
@@ -421,49 +469,60 @@ Clique em "Authorize" (cadeado) → cole: Bearer <token_copiado> → Authorize
 #### 3. Criar uma colônia
 ```
 POST /colonias
-Body: { "nome": "Base Alfa", "planeta": "MARTE", "setor": "A-7" }
-→ Anote o "id" retornado
+Body: { "nome": "Base Alfa", "planeta": "MARTE" }
+→ Anote o "id" retornado. Resposta já traz: agua=70, energia=80, oxigenio=90, alimento=40, temperatura=22, nivel=1, xp=0
 ```
 
 #### 4. Listar colônias
 ```
 GET /colonias
-→ Deve retornar a colônia criada com usuarioId (sem dados do usuário)
+→ Retorna lista com todos os campos de recursos, nível e XP diretamente no JSON
 ```
 
-#### 5. Consultar recursos da colônia
+#### 5. Consultar recursos detalhados (modelagem avançada)
 ```
 GET /colonias/{id}/recursos
-→ Deve retornar os 5 recursos inicializados: AGUA, ENERGIA, OXIGENIO, ALIMENTO, TEMPERATURA
+→ Retorna os 5 recursos via tabela RecursoColonia (chave composta): AGUA, ENERGIA, OXIGENIO, ALIMENTO, TEMPERATURA
+   com quantidade, quantidadeMaxima, percentual e flag critico
 ```
 
 #### 6. Criar um evento de impacto
 ```
 POST /eventos
-Body: { "titulo": "Tempestade Solar", "coloniaId": 1, "tipoEvento": "TEMPESTADE_SOLAR", "impactoPercentual": 20.0 }
-→ O recurso ENERGIA da colônia será reduzido em 20%
+Body: { "titulo": "Tempestade Solar", "descricao": "...", "coloniaId": 1, "tipoEvento": "TEMPESTADE_SOLAR", "impactoPercentual": 20.0 }
+→ O campo "energia" da colônia é reduzido em 20% (ex: 80 → 64)
+   O RecursoColonia de ENERGIA também é atualizado
 ```
 
 #### 7. Verificar impacto nos recursos
 ```
+GET /colonias/{id}
+→ Confirme que "energia" foi reduzido no campo direto da colônia
+
 GET /colonias/{id}/recursos
-→ Confirme que o valor de ENERGIA foi reduzido
+→ Confirme que o RecursoColonia de ENERGIA também foi reduzido
 ```
 
 #### 8. Consultar missões disponíveis
 ```
 GET /missoes
-→ Lista missões com seus IDs de perguntas
+→ Lista missões com IDs. Use o ID da pergunta no próximo passo
 ```
 
 #### 9. Registrar uma tentativa de resposta
 ```
 POST /tentativas
 Body: { "perguntaId": 1, "coloniaId": 1, "respostaEnviada": "B" }
-→ Se correta, a pontuação da colônia é atualizada
+→ Se correta: pontuacaoTotal, xp e nivel são atualizados automaticamente
 ```
 
-#### 10. Conferir o ranking
+#### 10. Verificar progressão da colônia
+```
+GET /colonias/{id}
+→ Confirme que xp aumentou e verifique se nivel subiu conforme a tabela de progressão
+```
+
+#### 11. Conferir o ranking
 ```
 GET /ranking
 → Colônias ordenadas por pontuação total (público, sem token)
@@ -505,6 +564,31 @@ Os seguintes usuários são criados automaticamente pelo `DataLoader` na inicial
 | Eduardo Martins | RM562259 |
 | Joao Victor Alcantara | RM562707 |
 | Phillipo Barbosa | RM565399 |
+
+---
+
+## Requisitos Atendidos
+
+| Requisito | Status | Detalhes |
+|---|---|---|
+| API REST com Spring Boot | ✅ | Spring Boot 3.2.5, Java 21 |
+| Organização em camadas | ✅ | controller / service / repository / entity / dto / enums / exception / security / config |
+| CRUD completo | ✅ | Colônias, Eventos, Missões, Tentativas |
+| JPA / JpaRepository | ✅ | Spring Data JPA com H2, relacionamentos LAZY, `@Transactional` |
+| DTOs com records | ✅ | Request e Response para todos os recursos, sem expor entidades JPA |
+| Validação de entrada | ✅ | `@Valid`, `@NotBlank`, `@NotNull`, `@Pattern`, `@DecimalMin/Max` |
+| Tratamento de exceções | ✅ | `GlobalExceptionHandler` com respostas padronizadas (400, 401, 403, 404, 409, 500) |
+| Autenticação JWT | ✅ | Spring Security + JJWT, stateless, perfis ALUNO / PROFESSOR / ADMINISTRADOR |
+| Swagger / OpenAPI | ✅ | Springdoc 2.5.0, disponível em `/swagger-ui/index.html` |
+| CORS configurado | ✅ | `CorsConfig.java` com origens liberadas para integração mobile e web |
+| Deploy público | ✅ | Render — https://gs1-java-hikm.onrender.com |
+| README organizado | ✅ | Este documento |
+| Herança JPA | ✅ | `Evento` abstrata com `SINGLE_TABLE` e 4 subclasses discriminadas |
+| `@Embeddable` | ✅ | `LocalizacaoEspacial` embutida na tabela de colônia |
+| Chave composta `@EmbeddedId` | ✅ | `RecursoColoniaId` com `coloniaId + tipoRecurso` em `RecursoColonia` |
+| Múltiplas tabelas | ✅ | 8 tabelas com relacionamentos `@ManyToOne` / `@OneToMany` |
+| Integração mobile | ✅ | `Colonia` retorna `agua`, `energia`, `oxigenio`, `alimento`, `temperatura`, `nivel`, `xp` direto no JSON |
+| Sistema de progressão | ✅ | XP e nível (1–5) calculados e sincronizados automaticamente a cada tentativa |
 
 ---
 

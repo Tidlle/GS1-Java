@@ -10,7 +10,7 @@ import br.com.fiap.systhesis.repository.UsuarioRepository;
 import br.com.fiap.systhesis.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,7 +29,7 @@ public class AuthService {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.email(), request.senha())
             );
-        } catch (BadCredentialsException e) {
+        } catch (AuthenticationException e) {
             throw new CredenciaisInvalidasException();
         }
 
