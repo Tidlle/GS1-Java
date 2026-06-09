@@ -924,16 +924,17 @@ Os seguintes usuários são criados automaticamente pelo `DataLoader` na inicial
 
 ## Links Importantes
 
-| Recurso                       | URL |
-|-------------------------------|---|
-| 🌐 Deploy da API              | https://gs1-java-hikm.onrender.com |
-| 📄 Swagger / OpenAPI          | https://gs1-java-hikm.onrender.com/swagger-ui/index.html#/ |
-| 🎥 Vídeo de Apresentação      | https://www.youtube.com/watch?v=E5A0ms8ggBw |
-| 🎥 Pitch da solução           | https://www.youtube.com/watch?v=Ibhw1XWrGOE |
-| 💻 Repositório GitHub         | https://github.com/Tidlle/GS1-Java.git |
-| ☁️ API em Nuvem Azure         | `http://IP_PUBLICO_DA_VM:8080/` |
-| ☁️ Swagger em Nuvem Azure     | `http://IP_PUBLICO_DA_VM:8080/swagger-ui/index.html` |
-| 🗄️ H2 Console em Nuvem Azure | `http://IP_PUBLICO_DA_VM:8082/` |
+| Recurso                         | URL |
+|---------------------------------|---|
+| 🌐 Deploy da API                | https://gs1-java-hikm.onrender.com |
+| 📄 Swagger / OpenAPI            | https://gs1-java-hikm.onrender.com/swagger-ui/index.html#/ |
+| 🎥 Vídeo de Apresentação Java   | https://www.youtube.com/watch?v=E5A0ms8ggBw |
+| 🎥 Vídeo de Apresentação DevOps | https://www.youtube.com/watch?v=yJoAtMNQjBE |
+| 🎥 Pitch da solução             | https://www.youtube.com/watch?v=Ibhw1XWrGOE |
+| 💻 Repositório GitHub           | https://github.com/Tidlle/GS1-Java.git |
+| ☁️ API em Nuvem Azure           | `http://IP_PUBLICO_DA_VM:8080/` |
+| ☁️ Swagger em Nuvem Azure       | `http://IP_PUBLICO_DA_VM:8080/swagger-ui/index.html` |
+| 🗄️ H2 Console em Nuvem Azure   | `http://IP_PUBLICO_DA_VM:8082/` |
 
 |                               |     |
 
