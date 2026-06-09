@@ -550,10 +550,8 @@ Os seguintes usuários são criados automaticamente pelo `DataLoader` na inicial
 |---|---|
 | 🌐 Deploy da API | https://gs1-java-hikm.onrender.com |
 | 📄 Swagger / OpenAPI | https://gs1-java-hikm.onrender.com/swagger-ui/index.html#/ |
-| 🎥 Vídeo de Apresentação | COLOCAR_LINK_DO_VIDEO_AQUI |
-| 💻 Repositório GitHub | COLOCAR_LINK_DO_GITHUB_AQUI |
-
-> **Aviso sobre o Render (plano gratuito):** O servidor pode entrar em modo de hibernação após 15 minutos de inatividade. A primeira requisição após esse período pode levar até 60 segundos para responder — aguarde e tente novamente.
+| 🎥 Vídeo de Apresentação | https://www.youtube.com/watch?v=E5A0ms8ggBw |
+| 💻 Repositório GitHub | https://github.com/Tidlle/GS1-Java.git |
 
 ---
 
