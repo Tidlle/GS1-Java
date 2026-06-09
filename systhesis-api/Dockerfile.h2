@@ -1,0 +1,19 @@
+FROM eclipse-temurin:21-jre-jammy
+
+ARG H2_VERSION=2.2.224
+
+RUN groupadd -r h2group && useradd -r -g h2group -d /opt/h2 -s /bin/sh h2user
+
+WORKDIR /opt/h2
+
+ADD https://repo1.maven.org/maven2/com/h2database/h2/${H2_VERSION}/h2-${H2_VERSION}.jar /opt/h2/h2.jar
+
+RUN mkdir -p /opt/h2-data && \
+    chown -R h2user:h2group /opt/h2 /opt/h2-data
+
+USER h2user
+
+EXPOSE 81
+EXPOSE 1521
+
+ENTRYPOINT ["java", "-cp", "/opt/h2/h2.jar", "org.h2.tools.Server", "-tcp", "-tcpAllowOthers", "-tcpPort", "1521", "-web", "-webAllowOthers", "-webPort", "81", "-baseDir", "/opt/h2-data", "-ifNotExists"]
