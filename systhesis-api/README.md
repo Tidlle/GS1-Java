@@ -2,7 +2,7 @@
 
 > **API REST para Simulação Gamificada de Gestão de Recursos em Colônias Espaciais**
 
-Projeto desenvolvido para a disciplina de **Java Advanced — Global Solution 2025** da **FIAP**.
+Projeto desenvolvido para a disciplina de **Java Advanced — Global Solution 2026** da **FIAP**.
 
 ---
 
@@ -13,6 +13,8 @@ Projeto desenvolvido para a disciplina de **Java Advanced — Global Solution 20
 - [Funcionalidades Principais](#-funcionalidades-principais)
 - [Tecnologias Utilizadas](#-tecnologias-utilizadas)
 - [Arquitetura do Projeto](#-arquitetura-do-projeto)
+- [Arquitetura Macro DevOps em Nuvem](#-arquitetura-macro-devops-em-nuvem)
+- [How To DevOps — Execução em Nuvem na Azure](#-how-to-devops--execução-em-nuvem-na-azure)
 - [Modelagem Avançada](#-modelagem-avançada)
 - [Segurança](#-segurança)
 - [Endpoints Principais](#-endpoints-principais)
@@ -82,6 +84,10 @@ O Systhesis tem como objetivo estimular:
 | **H2 Database**          | — | Banco de dados em memória para testes e deploy |
 | **Maven**                | 3.x | Gerenciamento de dependências e build |
 | **Render**               | — | Plataforma de deploy público da API |
+| **Docker**               | — | Containerização da aplicação e do banco H2 |
+| **Dockerfile**           | — | Geração da imagem personalizada da API |
+| **Azure Virtual Machine**| Ubuntu Linux | Execução da aplicação em ambiente de nuvem |
+| **Azure NSG / Firewall** | — | Liberação das portas 22, 8080, 8082 e 1521 |
 
 ---
 
@@ -184,6 +190,378 @@ systhesis-api/
 ├── Dockerfile
 └── pom.xml
 ```
+
+---
+
+## Arquitetura Macro DevOps em Nuvem
+
+A arquitetura macro abaixo representa a execução da solução **Systhesis API** em ambiente de nuvem, utilizando **Azure Virtual Machine**, **Docker Engine**, container da aplicação Java e container do banco de dados H2.
+
+![Arquitetura Macro Systhesis](assets/Arquitetura-systhesis.png)
+
+### Componentes da arquitetura
+
+| Componente | Função |
+|---|---|
+| **Cliente / Avaliador** | Acessa a API pela porta pública `8080`, utilizando navegador, Swagger UI ou Postman |
+| **GitHub** | Armazena o código-fonte completo, Dockerfile, README, tutorial de execução e imagem da arquitetura macro |
+| **Azure** | Ambiente de nuvem utilizado para hospedar a VM Linux |
+| **IP Público** | Permite o acesso externo à aplicação publicada na VM |
+| **Firewall / NSG** | Controla as portas liberadas para acesso externo |
+| **VM Linux / Ubuntu** | Máquina virtual onde o Docker Engine é instalado e os containers são executados |
+| **Docker Engine** | Responsável por criar e executar os containers da solução |
+| **Docker Network `systhesis-net`** | Rede Docker responsável pela comunicação interna entre o container da API e o container do banco |
+| **Container Java `systhesis-api-rm562259`** | Container da aplicação Java/Spring Boot, criado a partir do Dockerfile |
+| **Container H2 `systhesis-db-rm562259`** | Container do banco de dados H2, executado separadamente da aplicação |
+| **Volume `systhesis-h2-data`** | Volume nomeado utilizado para persistência dos dados do banco |
+| **Porta `8080`** | Acesso externo à API Java |
+| **Porta `8082`** | Acesso externo ao H2 Console |
+| **Porta `1521`** | Porta TCP utilizada pela aplicação para conectar ao banco H2 |
+| **Porta `22`** | Acesso SSH à VM Linux |
+
+### Fluxo da solução
+
+1. O avaliador acessa a API pelo navegador, Swagger UI ou Postman.
+2. A requisição chega no **IP público** da VM Azure.
+3. O **Firewall / NSG** libera o tráfego da porta necessária.
+4. A VM Linux recebe a requisição e encaminha para o container da aplicação Java.
+5. A aplicação Java executa dentro do container `systhesis-api-rm562259`.
+6. A API se comunica com o banco H2 através da rede Docker `systhesis-net`.
+7. O banco H2 grava os dados no volume nomeado `systhesis-h2-data`.
+8. As evidências da execução são obtidas por comandos como `docker ps`, `docker logs`, `docker exec`, `whoami`, `pwd`, `ls -l` e consultas `SELECT` no banco.
+
+---
+
+## How To DevOps — Execução em Nuvem na Azure
+
+Este tutorial descreve como executar a aplicação **desde o clone do repositório até os testes em nuvem**, conforme solicitado na entrega de DevOps.
+
+### Pré-requisitos
+
+- Conta ativa na Microsoft Azure
+- Azure CLI instalado ou Azure Cloud Shell
+- Git
+- Acesso SSH à VM
+- Docker instalado na VM
+- Repositório clonado com o código-fonte completo
+
+### 1. Criar o Resource Group
+
+```bash
+az group create --name rg-systhesis-gs1-rm562259 --location canadacentral
+```
+
+### 2. Criar a VM Linux na Azure
+
+```bash
+az vm create --resource-group rg-systhesis-gs1-rm562259 --name vm-systhesis-gs1-rm562259 --image Ubuntu2204 --size Standard_B2ats_v2 --admin-username azureuser --generate-ssh-keys --public-ip-sku Standard
+```
+
+### 3. Liberar as portas no Firewall / NSG
+
+```bash
+az vm open-port --resource-group rg-systhesis-gs1-rm562259 --name vm-systhesis-gs1-rm562259 --port 22 --priority 1000
+```
+
+```bash
+az vm open-port --resource-group rg-systhesis-gs1-rm562259 --name vm-systhesis-gs1-rm562259 --port 8080 --priority 1001
+```
+
+```bash
+az vm open-port --resource-group rg-systhesis-gs1-rm562259 --name vm-systhesis-gs1-rm562259 --port 8082 --priority 1002
+```
+
+```bash
+az vm open-port --resource-group rg-systhesis-gs1-rm562259 --name vm-systhesis-gs1-rm562259 --port 1521 --priority 1003
+```
+
+### 4. Obter o IP público da VM
+
+```bash
+az vm show --resource-group rg-systhesis-gs1-rm562259 --name vm-systhesis-gs1-rm562259 --show-details --query publicIps --output tsv
+```
+
+Anote o IP retornado. Ele será usado para acessar a API e o H2 Console.
+
+### 5. Conectar na VM via SSH
+
+```bash
+ssh azureuser@IP_PUBLICO_DA_VM
+```
+
+Exemplo:
+
+```bash
+ssh azureuser@20.200.100.50
+```
+
+### 6. Atualizar a VM e instalar dependências
+
+```bash
+sudo apt update
+sudo apt upgrade -y
+sudo apt install -y git ca-certificates curl gnupg
+```
+
+### 7. Instalar Docker Engine
+
+```bash
+sudo install -m 0755 -d /etc/apt/keyrings
+```
+
+```bash
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo tee /etc/apt/keyrings/docker.asc > /dev/null
+```
+
+```bash
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+```
+
+```bash
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+```bash
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+```
+
+### 8. Habilitar e testar o Docker
+
+```bash
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo docker --version
+sudo docker ps
+```
+
+Opcionalmente, permita executar Docker sem `sudo`:
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+docker ps
+```
+
+### 9. Clonar o repositório
+
+```bash
+git clone https://github.com/Tidlle/GS1-Java.git
+```
+
+```bash
+cd GS1-Java/systhesis-api
+```
+
+Confira se o Dockerfile está na pasta:
+
+```bash
+ls -l
+```
+
+Arquivos esperados:
+
+```text
+Dockerfile
+pom.xml
+src
+```
+
+### 10. Criar a imagem personalizada da API via Dockerfile
+
+```bash
+docker build -t systhesis-api:1.0 .
+```
+
+Confira a imagem criada:
+
+```bash
+docker images
+```
+
+### 11. Criar a rede Docker
+
+```bash
+docker network create systhesis-net
+```
+
+```bash
+docker network ls
+```
+
+### 12. Criar o volume nomeado do banco
+
+```bash
+docker volume create systhesis-h2-data
+```
+
+```bash
+docker volume ls
+```
+
+### 13. Subir o container do banco H2
+
+```bash
+docker run -d \
+  --name systhesis-db-rm562259 \
+  --network systhesis-net \
+  -p 8082:81 \
+  -p 1521:1521 \
+  -v systhesis-h2-data:/opt/h2-data \
+  -e H2_OPTIONS="-tcp -tcpAllowOthers -web -webAllowOthers -ifNotExists" \
+  oscarfonts/h2:2.2.224
+```
+
+Verifique os logs do banco:
+
+```bash
+docker logs systhesis-db-rm562259
+```
+
+Saída esperada:
+
+```text
+TCP server running at tcp://...:1521
+Web Console server running at http://...:81
+```
+
+### 14. Subir o container da API Java
+
+```bash
+docker run -d \
+  --name systhesis-api-rm562259 \
+  --network systhesis-net \
+  -p 8080:8080 \
+  -e PORT=8080 \
+  -e SPRING_DATASOURCE_URL="jdbc:h2:tcp://systhesis-db-rm562259:1521//opt/h2-data/systhesisdb" \
+  -e SPRING_DATASOURCE_USERNAME=sa \
+  -e SPRING_DATASOURCE_PASSWORD="" \
+  -e SPRING_JPA_HIBERNATE_DDL_AUTO=update \
+  -e SPRING_H2_CONSOLE_ENABLED=false \
+  systhesis-api:1.0
+```
+
+Verifique se os containers estão rodando:
+
+```bash
+docker ps
+```
+
+Devem aparecer os dois containers:
+
+```text
+systhesis-api-rm562259
+systhesis-db-rm562259
+```
+
+### 15. Verificar logs da aplicação
+
+```bash
+docker logs systhesis-api-rm562259
+```
+
+Saída esperada:
+
+```text
+Tomcat started on port 8080
+Started SysthesisApplication
+```
+
+### 16. Testar a API dentro da VM
+
+```bash
+curl -i http://localhost:8080/
+```
+
+```bash
+curl -i http://localhost:8080/swagger-ui/index.html
+```
+
+### 17. Testar a API no navegador
+
+No navegador, acesse:
+
+```text
+http://IP_PUBLICO_DA_VM:8080/
+```
+
+Swagger UI:
+
+```text
+http://IP_PUBLICO_DA_VM:8080/swagger-ui/index.html
+```
+
+### 18. Acessar o H2 Console em nuvem
+
+No navegador, acesse:
+
+```text
+http://IP_PUBLICO_DA_VM:8082/
+```
+
+Preencha os campos da conexão:
+
+```text
+Saved Settings: Generic H2 (Server)
+Driver Class: org.h2.Driver
+JDBC URL: jdbc:h2:tcp://localhost:1521//opt/h2-data/systhesisdb
+User Name: sa
+Password: 
+```
+
+O campo **Password** deve ficar em branco.
+
+### 19. Executar testes no banco H2
+
+No H2 Console, execute:
+
+```sql
+SHOW TABLES;
+```
+
+Depois execute consultas em tabelas criadas pela aplicação, por exemplo:
+
+```sql
+SELECT * FROM TB_USUARIO;
+```
+
+```sql
+SELECT * FROM TB_COLONIA;
+```
+
+```sql
+SELECT * FROM TB_RECURSO_COLONIA;
+```
+
+### 20. Testes de CRUD em nuvem
+
+Acesse o Swagger em:
+
+```text
+http://IP_PUBLICO_DA_VM:8080/swagger-ui/index.html
+```
+
+Sequência recomendada:
+
+1. Fazer login em `POST /auth/login`.
+2. Copiar o token JWT retornado.
+3. Clicar em **Authorize** e informar `Bearer TOKEN`.
+4. Criar uma colônia em `POST /colonias`.
+5. Listar colônias em `GET /colonias`.
+6. Consultar recursos da colônia em `GET /colonias/{id}/recursos`.
+7. Criar evento em `POST /eventos`.
+8. Consultar ranking em `GET /ranking`.
+9. Abrir o H2 Console e executar `SELECT` para comprovar persistência no banco.
+
+### 21. Resumo dos acessos em nuvem
+
+| Recurso | URL |
+|---|---|
+| API | `http://IP_PUBLICO_DA_VM:8080/` |
+| Swagger UI | `http://IP_PUBLICO_DA_VM:8080/swagger-ui/index.html` |
+| H2 Console | `http://IP_PUBLICO_DA_VM:8082/` |
+| H2 JDBC URL | `jdbc:h2:tcp://localhost:1521//opt/h2-data/systhesisdb` |
+
 
 ---
 
@@ -552,6 +930,9 @@ Os seguintes usuários são criados automaticamente pelo `DataLoader` na inicial
 | 📄 Swagger / OpenAPI | https://gs1-java-hikm.onrender.com/swagger-ui/index.html#/ |
 | 🎥 Vídeo de Apresentação | https://www.youtube.com/watch?v=E5A0ms8ggBw |
 | 💻 Repositório GitHub | https://github.com/Tidlle/GS1-Java.git |
+| ☁️ API em Nuvem Azure | `http://IP_PUBLICO_DA_VM:8080/` |
+| ☁️ Swagger em Nuvem Azure | `http://IP_PUBLICO_DA_VM:8080/swagger-ui/index.html` |
+| 🗄️ H2 Console em Nuvem Azure | `http://IP_PUBLICO_DA_VM:8082/` |
 
 ---
 
@@ -587,7 +968,16 @@ Os seguintes usuários são criados automaticamente pelo `DataLoader` na inicial
 | Múltiplas tabelas | ✅ | 8 tabelas com relacionamentos `@ManyToOne` / `@OneToMany` |
 | Integração mobile | ✅ | `Colonia` retorna `agua`, `energia`, `oxigenio`, `alimento`, `temperatura`, `nivel`, `xp` direto no JSON |
 | Sistema de progressão | ✅ | XP e nível (1–5) calculados e sincronizados automaticamente a cada tentativa |
+| Arquitetura macro DevOps | ✅ | Desenho incluído no README com Azure, VM, Docker, containers, rede e volume |
+| Execução em nuvem | ✅ | Tutorial com Azure CLI, VM Linux, Docker Engine e testes por IP público |
+| Dockerfile da aplicação | ✅ | Imagem personalizada da API construída via `docker build` |
+| Container da aplicação | ✅ | Container `systhesis-api-rm562259` executando a API Java na porta `8080` |
+| Container do banco | ✅ | Container `systhesis-db-rm562259` executando H2 com console na porta `8082` |
+| Rede Docker | ✅ | Rede nomeada `systhesis-net` conectando API e banco |
+| Volume nomeado | ✅ | Volume `systhesis-h2-data` para persistência do banco |
+| Variáveis de ambiente | ✅ | Configuração da API via `SPRING_DATASOURCE_URL`, usuário, senha e JPA |
+| Evidências por terminal | ✅ | Comandos `docker ps`, `docker logs`, `docker exec`, `whoami`, `pwd`, `ls -l` e `SELECT` |
 
 ---
 
-> Projeto desenvolvido para fins acadêmicos — **Global Solution 2025 · Java Advanced · FIAP**
+> Projeto desenvolvido para fins acadêmicos — **Global Solution 2026 · Java Advanced e DevOps Tools and Cloud Computing · FIAP**
